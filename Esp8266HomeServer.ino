@@ -13,6 +13,7 @@
 #include <RestClient.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <EEPROM.h>
 #include<SoftwareSerial.h> //Included SoftwareSerial Library
 //Started SoftwareSerial at RX and TX pin of ESP8266
 SoftwareSerial s(2,3);
@@ -32,6 +33,7 @@ void setup() {
   }
   server.on("/specificArgs", handleSpecificArg);
   server.on("/status", handleStatus);
+  server.on("/processRequest",processRequest);
   server.begin();
   delay(500);
   //Serial1.begin(9600);
@@ -86,27 +88,47 @@ void handleSpecificArg() {
 }
 void handleStatus() {
   String message = "";
-  if(server.arg("status_no") == "") {
-    message = "Status No not found";
+  if(server.arg("item_no") == "") {
+    message = "{'err_msg' : 'Invalid Item No'}";
   }
   else {
-    message = "Temperature Argument = ";
+    message = "";
     char post_data_char[2];
     String post_data_string = "";
     String reccived_data = "";
     int post_data = 0;
  
-    post_data_string = server.arg("status_no");
+    post_data_string = server.arg("item_no");
+    post_data_string.toCharArray(post_data_char,2);
+    post_data = atoi(post_data_char);
+    int pin_status = EEPROM.read(post_data);
+    message = "{'pin_status': ";
+    message += pin_status;
+    message += " }";
+  }
+  server.send(200, "application/json", message); 
+}
+
+void processRequest() {
+  String message = "";
+  if(server.arg("item_no") == "") {
+    message = "{'err_msg' : 'Invalid Item No'}";
+  }
+  else {
+    String post_data_string = "";
+    char post_data_char[2];
+    int post_data = 0;
+    int pin_status = 0;
+    post_data_string = server.arg("item_no");
     post_data_string.toCharArray(post_data_char,2);
     post_data = atoi(post_data_char);
     s.write(post_data);
-    //delay(10);
-    message += server.arg("status_no");
-    if(s.available()) {
-      message += "Pin is "+ s.read();
-    }  
+    if(EEPROM.read(post_data) == 0) {
+      pin_status = 1;
+    }
+    EEPROM.write(post_data,pin_status);
+    message = "{'success' : '1'}";
   }
-  delay(100);
-  server.send(200, "text/plain", message); 
+  server.send(200, "application/json", message); 
 }
 
